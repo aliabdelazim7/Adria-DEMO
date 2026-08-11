@@ -1,7 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://placeholder-project.supabase.co';
-const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_key';
+const supabaseUrl =
+  (import.meta.env.VITE_SUPABASE_URL as string) ||
+  (import.meta.env.NEXT_PUBLIC_SUPABASE_URL as string) ||
+  (import.meta.env.SUPABASE_URL as string) ||
+  'https://placeholder-project.supabase.co';
+
+const supabaseAnonKey =
+  (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ||
+  (import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string) ||
+  (import.meta.env.SUPABASE_ANON_KEY as string) ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_key';
+
+if (typeof window !== 'undefined' && supabaseUrl.includes('placeholder')) {
+  console.warn('⚠️ Supabase URL is set to placeholder. Make sure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in Vercel and trigger a Redeploy.');
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
