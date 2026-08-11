@@ -1,8 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "crons": [
-    { "path": "/api/scheduled-reports", "schedule": "0 0 * * *" }
-  ]
-}
