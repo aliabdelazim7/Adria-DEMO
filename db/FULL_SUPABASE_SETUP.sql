@@ -1,5 +1,5 @@
 -- =============================================================================
--- ADRIA — إعداد قاعدة البيانات بالكامل لـ Supabase (ملف شامل وإلكتروني 100%)
+-- ADRIA — إعداد قاعدة البيانات الشاملة مع كامل بيانات الديمو التوضيحية
 -- انسخ محتوى هذا الملف بالكامل والصقه في:
 -- Supabase Dashboard > SQL Editor > New query > Run
 -- =============================================================================
@@ -8,26 +8,26 @@
 create extension if not exists pgcrypto;
 create extension if not exists "uuid-ossp";
 
--- ---------- (2) الجداول الرئيسية ----------
+-- ---------- (2) إنشاء الجداول ----------
 
 -- إعدادات المتجر
 create table if not exists store_settings (
   id uuid default gen_random_uuid() primary key,
-  name text not null default 'محل قطع غيار السيارات',
+  name text not null default 'مركز أدريا لقطع غيار السيارات والصيانة',
   currency text default 'ج.م',
   logo text default 'https://cdn-icons-png.flaticon.com/512/3143/3143641.png',
   tax_rate numeric default 0,
   theme_color text default '#4f46e5',
-  address text default '',
-  phone text default '',
-  phone2 text default '',
+  address text default 'القاهرة - حي المعادي - شارع النصر',
+  phone text default '01000000000',
+  phone2 text default '01100000000',
   whatsapp_country_code text default '2',
-  initial_balance numeric default 0,
+  initial_balance numeric default 15000,
   location_url text default '',
-  allow_cashier_employee_advance boolean default false,
+  allow_cashier_employee_advance boolean default true,
   day_start_hour integer default 3,
-  receipt_header text default '',
-  receipt_footer text default ''
+  receipt_header text default 'أهلاً بكم في مركز أدريا لقطع غيار السيارات',
+  receipt_footer text default 'شكراً لزيارتكم نتمنى لكم رحلة آمنة'
 );
 
 -- الفئات
@@ -160,7 +160,6 @@ create table if not exists invoice_counter (
   current_value integer default 1,
   check (id = 1)
 );
-insert into invoice_counter (id, current_value) values (1, 1) on conflict (id) do nothing;
 
 -- بنود الفاتورة
 create table if not exists order_items (
@@ -247,7 +246,7 @@ create table if not exists cashiers (
   created_at timestamptz default now()
 );
 
--- مستخدمو لوحة التحكم بصلاحيات
+-- مستخدمو لوحة التحكم
 create table if not exists admin_users (
   id uuid default gen_random_uuid() primary key,
   name text not null,
@@ -257,7 +256,7 @@ create table if not exists admin_users (
   created_at timestamptz default now()
 );
 
--- الموظفين والرواتب والخصومات
+-- الموظفين والرواتب
 create table if not exists employees (
   id uuid default gen_random_uuid() primary key,
   name text not null,
@@ -362,7 +361,6 @@ create table if not exists coupons (
   created_at timestamptz default now()
 );
 
--- جداول فرعية إضافية
 create table if not exists wholesale_otp (
   id uuid default gen_random_uuid() primary key,
   code text not null,
@@ -447,7 +445,6 @@ create table if not exists held_invoices (
   created_at timestamptz default now()
 );
 
--- التصنيع والخامات
 create table if not exists materials (
   id uuid default gen_random_uuid() primary key,
   name text not null,
@@ -473,7 +470,7 @@ create table if not exists production_materials (
   unit_cost numeric default 0
 );
 
--- ---------- (3) تفعيل Row Level Security (RLS) ----------
+-- ---------- (3) تفعيل RLS وسياسات الوصول ----------
 do $$
 declare t text;
 begin
@@ -501,7 +498,6 @@ end $$;
 
 -- ---------- (4) دالّات الـ RPC لشاشات الدخول ----------
 
--- قراءة بيانات شاشة دخول الكاشير بدون مفتاح أدمن
 create or replace function public.get_pos_login_data()
 returns jsonb language sql security definer set search_path = public as $$
   select jsonb_build_object(
@@ -520,7 +516,6 @@ returns jsonb language sql security definer set search_path = public as $$
   );
 $$;
 
--- قراءة قائمة مستخدمي لوحة التحكم عند الدخول
 create or replace function public.get_admin_login_data()
 returns jsonb language sql security definer set search_path = public as $$
   select coalesce(
@@ -535,55 +530,122 @@ grant execute on function public.get_pos_login_data() to anon, authenticated;
 revoke all on function public.get_admin_login_data() from public;
 grant execute on function public.get_admin_login_data() to anon, authenticated;
 
--- ---------- (5) البيانات الأولية وتغذية يوزارات الديمو ----------
+-- ---------- (5) تصفير الجداول وتغذية بيانات الديمو الكاملة ----------
 
--- إعدادات المتجر الافتراضية
-insert into store_settings (name, currency, tax_rate, theme_color, initial_balance)
-select 'محل قطع غيار السيارات', 'ج.م', 0, '#4f46e5', 0
-where not exists (select 1 from store_settings);
-
--- التصنيفات الأولية
-insert into categories (name) values
-  ('فلاتر وزيوت'),
-  ('فرامل'),
-  ('نظام التعليق والعفشة'),
-  ('كهرباء وبطاريات'),
-  ('المحرك والتبريد'),
-  ('الإطارات والجنوط'),
-  ('الإضاءة والكشافات'),
-  ('إكسسوارات وكماليات')
-on conflict do nothing;
-
--- عيّنة المنتجات التجريبية
-insert into products (name, barcode, purchase_price, average_purchase_price, sale_price, stock_quantity, category_id) values
-('فلتر زيت تويوتا أصلي',            '1001', 90,  90,  150,  60, (select id from categories where name='فلاتر وزيوت')),
-('فلتر هواء هيونداي',               '1002', 120, 120, 200,  40, (select id from categories where name='فلاتر وزيوت')),
-('زيت محرك توتال 5W-30 (4 لتر)',    '1005', 850, 850, 1150, 30, (select id from categories where name='فلاتر وزيوت')),
-('تيل فرامل أمامي كوري',            '2001', 350, 350, 520,  30, (select id from categories where name='فرامل')),
-('مساعد أمامي KYB',                 '3001', 750, 750, 1050, 16, (select id from categories where name='نظام التعليق والعفشة')),
-('بطارية كلورايد 70 أمبير',         '4001', 1900, 1900, 2400, 20, (select id from categories where name='كهرباء وبطاريات')),
-('سير كاتينة (تيمنج) دايكو',        '5001', 250, 250, 400,  20, (select id from categories where name='المحرك والتبريد')),
-('إطار 185/65 R15',                 '6002', 1600, 1600, 2150, 20, (select id from categories where name='الإطارات والجنوط')),
-('فانوس أمامي LED',                 '7001', 1100, 1100, 1600, 10, (select id from categories where name='الإضاءة والكشافات')),
-('مساحات زجاج أمامي (طقم)',         '8001', 130,  130,  230,  50,  (select id from categories where name='إكسسوارات وكماليات'))
-on conflict (barcode) do nothing;
-
--- ── تصفير وإدخال مستخدمي الديمو التجريبيين ───────────────────
+truncate table order_items cascade;
+truncate table orders cascade;
+truncate table purchase_items cascade;
+truncate table purchase_invoices cascade;
+truncate table expenses cascade;
+truncate table products cascade;
+truncate table categories cascade;
+truncate table customers cascade;
+truncate table suppliers cascade;
 truncate table cashiers cascade;
 truncate table admin_users cascade;
 truncate table employees cascade;
+truncate table employee_transactions cascade;
+truncate table employee_leaves cascade;
+truncate table car_subscriptions cascade;
+truncate table maintenance_appointments cascade;
 
+-- إعدادات المحل
+delete from store_settings;
+insert into store_settings (name, currency, tax_rate, theme_color, initial_balance, address, phone, receipt_header, receipt_footer)
+values ('مركز أدريا لقطع غيار السيارات والصيانة', 'ج.م', 0, '#4f46e5', 15000, 'القاهرة - المعادي - شارع النصر', '01000000000', 'أهلاً بكم في مركز أدريا لقطع غيار السيارات', 'شكراً لزيارتكم نتمنى لكم رحلة آمنة');
+
+-- 1. التصنيفات
+insert into categories (id, name) values
+  ('c1000000-0000-0000-0000-000000000001', 'فلاتر وزيوت'),
+  ('c2000000-0000-0000-0000-000000000002', 'فرامل ونظام تعليق'),
+  ('c3000000-0000-0000-0000-000000000003', 'كهرباء وبطاريات'),
+  ('c4000000-0000-0000-0000-000000000004', 'محركات وميكانيكا'),
+  ('c5000000-0000-0000-0000-000000000005', 'إضاءة وكشافات'),
+  ('c6000000-0000-0000-0000-000000000006', 'إكسسوارات وكماليات');
+
+-- 2. المنتجات (مع تنوع في المخزون وأسعار الشراء والبيع والبار كود)
+insert into products (id, name, barcode, purchase_price, average_purchase_price, sale_price, stock_quantity, category_id) values
+  ('p1000000-0000-0000-0000-000000000001', 'تيل فرامل أمامي كوري', '1001', 450, 450, 650, 18, 'c2000000-0000-0000-0000-000000000002'),
+  ('p1000000-0000-0000-0000-000000000002', 'فلتر زيت تويوتا أصلي', '1002', 120, 120, 180, 42, 'c1000000-0000-0000-0000-000000000001'),
+  ('p1000000-0000-0000-0000-000000000003', 'طقم بوجيهات NGK ليزر', '1003', 350, 350, 480, 12, 'c3000000-0000-0000-0000-000000000003'),
+  ('p1000000-0000-0000-0000-000000000004', 'سير كاتينة دايكو', '1004', 280, 280, 420, 8,  'c4000000-0000-0000-0000-000000000004'),
+  ('p1000000-0000-0000-0000-000000000005', 'مساعد خلفي KYB', '1005', 850, 850, 1100, 2,  'c2000000-0000-0000-0000-000000000002'), -- منخفض للمخزون (2)
+  ('p1000000-0000-0000-0000-000000000006', 'بطارية كلورايد 70 أمبير', '1006', 1800, 1800, 2400, 5, 'c3000000-0000-0000-0000-000000000003'),
+  ('p1000000-0000-0000-0000-000000000007', 'طلمبة بنزين بوش', '1007', 650, 650, 950, 1,  'c4000000-0000-0000-0000-000000000004'), -- منخفض للمخزون (1)
+  ('p1000000-0000-0000-0000-000000000008', 'فلتر هواء هيونداي', '1008', 150, 150, 220, 25, 'c1000000-0000-0000-0000-000000000001'),
+  ('p1000000-0000-0000-0000-000000000009', 'زيت محرك توتال 5W-30 (4L)', '1009', 850, 850, 1150, 20, 'c1000000-0000-0000-0000-000000000001'),
+  ('p1000000-0000-0000-0000-000000000010', 'فانوس أمامي ليد', '1010', 1100, 1100, 1600, 6, 'c5000000-0000-0000-0000-000000000005'),
+  ('p1000000-0000-0000-0000-000000000011', 'مساحات زجاج أمامي (طقم)', '1011', 130, 130, 230, 35, 'c6000000-0000-0000-0000-000000000006');
+
+-- 3. العملاء
+insert into customers (id, custom_id, name, phone, card_number, address) values
+  ('u1000000-0000-0000-0000-000000000001', 'CUST-101', 'أحمد محمود العبد', '01012345678', '1001', 'المعادي - القاهرة'),
+  ('u1000000-0000-0000-0000-000000000002', 'CUST-102', 'المهندس خالد حسن', '01198765432', '1002', 'مدينة نصر - القاهرة'),
+  ('u1000000-0000-0000-0000-000000000003', 'CUST-103', 'شركة الأمل للنقل', '01234567890', '1003', 'التجمع الخامس'),
+  ('u1000000-0000-0000-0000-000000000004', 'CUST-104', 'سامح توفيق', '01055554444', '1004', 'الجيزة');
+
+-- 4. الموردين
+insert into suppliers (id, name, phone, address) values
+  ('s1000000-0000-0000-0000-000000000001', 'شركة البوش لقطع الغيار', '01000111222', 'العتبة - القاهرة'),
+  ('s1000000-0000-0000-0000-000000000002', 'مؤسسة الكوري للأجزاء الأصلية', '01111222333', 'توفيقية - القاهرة');
+
+-- 5. الكاشيرية ومدراء اللوحة
 insert into cashiers (id, name, password, email, phone, full_access) values
-  (gen_random_uuid(), 'كاشير 1 (أحمد)', '1234', 'cashier1@demo.local', '01000000001', true),
-  (gen_random_uuid(), 'كاشير 2 (سارة)', '1234', 'cashier2@demo.local', '01000000002', false);
+  ('c0000000-0000-0000-0000-000000000001', 'كاشير 1 (أحمد)', '1234', 'cashier1@demo.local', '01000000001', true),
+  ('c0000000-0000-0000-0000-000000000002', 'كاشير 2 (سارة)', '1234', 'cashier2@demo.local', '01000000002', false);
 
 insert into admin_users (id, name, password, email, permissions) values
-  (gen_random_uuid(), 'مدير النظام التجريبي', '1234', 'admin-demo@demo.local', '[]'::jsonb);
+  ('a0000000-0000-0000-0000-000000000001', 'مدير النظام التجريبي', '1234', 'admin-demo@demo.local', '[]'::jsonb);
 
+-- 6. الموظفين
 insert into employees (id, name, job_title, working_hours, monthly_salary, annual_leave_balance, is_active) values
-  (gen_random_uuid(), 'محمد علي (موظف ديمو)', 'كاشير رئيسي', '8 ساعات', 5000, 21, true),
-  (gen_random_uuid(), 'مريم محمود (موظف ديمو)', 'محاسب', '8 ساعات', 6000, 21, true);
+  ('e1000000-0000-0000-0000-000000000001', 'محمد علي (موظف ديمو)', 'كاشير رئيسي', '8 ساعات', 5000, 21, true),
+  ('e1000000-0000-0000-0000-000000000002', 'مريم محمود (موظف ديمو)', 'محاسب', '8 ساعات', 6000, 21, true);
+
+-- 7. فواتير مبيعات ديمو مكتملة (تغذي شاشة النظرة العامة، الفواتير، التقارير)
+insert into orders (id, total, paid_amount, paid_cash, paid_visa, paid_wallet, paid_instapay, payment_method, type, customer_id, cashier_name, created_at) values
+  ('1', 1300, 1300, 1300, 0, 0, 0, 'cash', 'sale', 'u1000000-0000-0000-0000-000000000001', 'كاشير 1 (أحمد)', now() - interval '3 days'),
+  ('2', 2850, 2850, 0, 2850, 0, 0, 'visa', 'sale', 'u1000000-0000-0000-0000-000000000002', 'كاشير 1 (أحمد)', now() - interval '2 days'),
+  ('3', 4400, 4400, 0, 0, 0, 4400, 'instapay', 'sale', 'u1000000-0000-0000-0000-000000000003', 'كاشير 2 (سارة)', now() - interval '2 days'),
+  ('4', 1950, 1950, 1950, 0, 0, 0, 'cash', 'sale', 'u1000000-0000-0000-0000-000000000004', 'كاشير 1 (أحمد)', now() - interval '1 day'),
+  ('5', 3600, 3600, 0, 0, 3600, 0, 'wallet', 'sale', 'u1000000-0000-0000-0000-000000000001', 'كاشير 2 (سارة)', now() - interval '1 day'),
+  ('6', 5200, 5200, 5200, 0, 0, 0, 'cash', 'sale', 'u1000000-0000-0000-0000-000000000002', 'كاشير 1 (أحمد)', now() - interval '5 hours'),
+  ('7', 850,  850,  850,  0, 0, 0, 'cash', 'sale', 'u1000000-0000-0000-0000-000000000003', 'كاشير 2 (سارة)', now() - interval '3 hours'),
+  ('8', 6100, 6100, 0, 0, 0, 6100, 'instapay', 'sale', 'u1000000-0000-0000-0000-000000000004', 'كاشير 1 (أحمد)', now() - interval '1 hour');
+
+-- ضبط عداد الفواتير
+insert into invoice_counter (id, current_value) values (1, 9) on conflict (id) do update set current_value = 9;
+
+-- بنود فواتير المبيعات
+insert into order_items (order_id, product_id, product_name, barcode, quantity, sale_price, purchase_price) values
+  ('1', 'p1000000-0000-0000-0000-000000000001', 'تيل فرامل أمامي كوري', '1001', 2, 650, 450),
+  ('2', 'p1000000-0000-0000-0000-000000000009', 'زيت محرك توتال 5W-30 (4L)', '1009', 2, 1150, 850),
+  ('2', 'p1000000-0000-0000-0000-000000000002', 'فلتر زيت تويوتا أصلي', '1002', 3, 180, 120),
+  ('3', 'p1000000-0000-0000-0000-000000000006', 'بطارية كلورايد 70 أمبير', '1006', 1, 2400, 1800),
+  ('3', 'p1000000-0000-0000-0000-000000000010', 'فانوس أمامي ليد', '1010', 1, 1600, 1100),
+  ('3', 'p1000000-0000-0000-0000-000000000004', 'سير كاتينة دايكو', '1004', 1, 420, 280),
+  ('4', 'p1000000-0000-0000-0000-000000000003', 'طقم بوجيهات NGK ليزر', '1003', 3, 480, 350),
+  ('4', 'p1000000-0000-0000-0000-000000000011', 'مساحات زجاج أمامي (طقم)', '1011', 2, 230, 130),
+  ('5', 'p1000000-0000-0000-0000-000000000005', 'مساعد خلفي KYB', '1005', 3, 1100, 850),
+  ('5', 'p1000000-0000-0000-0000-000000000008', 'فلتر هواء هيونداي', '1008', 1, 220, 150),
+  ('6', 'p1000000-0000-0000-0000-000000000006', 'بطارية كلورايد 70 أمبير', '1006', 2, 2400, 1800),
+  ('6', 'p1000000-0000-0000-0000-000000000004', 'سير كاتينة دايكو', '1004', 1, 420, 280),
+  ('7', 'p1000000-0000-0000-0000-000000000001', 'تيل فرامل أمامي كوري', '1001', 1, 650, 450),
+  ('7', 'p1000000-0000-0000-0000-000000000008', 'فلتر هواء هيونداي', '1008', 1, 220, 150),
+  ('8', 'p1000000-0000-0000-0000-000000000007', 'طلمبة بنزين بوش', '1007', 4, 950, 650),
+  ('8', 'p1000000-0000-0000-0000-000000000010', 'فانوس أمامي ليد', '1010', 1, 1600, 1100),
+  ('8', 'p1000000-0000-0000-0000-000000000003', 'طقم بوجيهات NGK ليزر', '1003', 1, 480, 350);
+
+-- 8. مصروفات ديمو
+insert into expenses (category, amount, note, payment_method, paid_cash, created_at) values
+  ('إيجار المحل', 4000, 'إيجار شهر الحالي', 'cash', 4000, now() - interval '4 days'),
+  ('كهرباء ومياه', 850, 'فاتورة الكهرباء المجمعة', 'cash', 850, now() - interval '2 days'),
+  ('ضيافة ومستلزمات', 320, 'شاي وقهوة وضيافة العملاء', 'cash', 320, now() - interval '1 day');
+
+-- 9. معاملة رواتب ديمو
+insert into employee_transactions (employee_id, amount, type, payment_method, paid_cash, month, note, created_at) values
+  ('e1000000-0000-0000-0000-000000000001', 1000, 'advance', 'cash', 1000, to_char(current_date, 'YYYY-MM'), 'سلفة على راتب الشهر', now() - interval '3 days');
 
 -- =============================================================================
--- تم إعداد قاعدة البيانات بالكامل وجاهزة 100% لاستقبال العمليات وتجربة الديمو.
+-- تم إعداد قاعدة البيانات وتغذية كافة شاشات ولوحة التحكم بالبيانات العرضية.
 -- =============================================================================
