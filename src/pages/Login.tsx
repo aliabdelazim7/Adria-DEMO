@@ -45,15 +45,7 @@ export default function Login() {
             <Lock size={32} className="text-white" />
           </div>
         </div>
-        <h2 className="text-2xl font-bold text-center text-white mb-4">لوحة التحكم</h2>
-
-        {/* تنبيه تجربة الديمو للعملاء */}
-        <div className="mb-6 bg-indigo-950/60 border border-indigo-500/30 rounded-2xl p-3 text-center">
-          <p className="text-indigo-300 font-black text-xs">✨ حسابات الدخول التجريبية (Demo Users)</p>
-          <p className="text-indigo-200/80 text-[11px] font-bold mt-1">
-            المدير العام: الرمز السري <span className="font-mono text-white bg-indigo-800 px-1.5 py-0.5 rounded font-bold">1111</span> أو <span className="font-mono text-white bg-indigo-800 px-1.5 py-0.5 rounded font-bold">1234</span>
-          </p>
-        </div>
+        <h2 className="text-2xl font-bold text-center text-white mb-8">لوحة التحكم</h2>
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>

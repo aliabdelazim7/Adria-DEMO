@@ -591,15 +591,6 @@ export interface AdminUser {
   created_at?: string;
 }
 
-export const DEFAULT_DEMO_CASHIERS: Cashier[] = [
-  { id: 'demo-cashier-1', name: 'كاشير 1 (أحمد)', password: '1234', phone: '', photo_url: '', full_access: true, created_at: new Date().toISOString() },
-  { id: 'demo-cashier-2', name: 'كاشير 2 (سارة)', password: '1234', phone: '', photo_url: '', full_access: false, created_at: new Date().toISOString() },
-];
-
-export const DEFAULT_DEMO_ADMIN_USERS: AdminUser[] = [
-  { id: 'demo-admin-1', name: 'مدير النظام التجريبي', email: 'admin-demo@demo.local', password: '1234', permissions: [], created_at: new Date().toISOString() },
-];
-
 // ─── Store Interface ──────────────────────────────────────────
 interface CashierStore {
   storeSettings: StoreSettings;
@@ -929,7 +920,7 @@ interface CashierStore {
   isPOSAuthenticated: boolean;
   adminPermissions: string[] | null; // null = صلاحيات كاملة (المدير العام)
   login: (pin: string) => Promise<boolean>;
-  loginAdminUser: (user: { email?: string; password?: string; permissions?: string[] }, password: string) => Promise<boolean>;
+  loginAdminUser: (user: { email?: string; permissions?: string[] }, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   loginPOS: (name: string, password?: string) => Promise<boolean>;
   logoutPOS: () => Promise<void>;
@@ -1051,8 +1042,12 @@ async function isAccountingDayClosed(settings: StoreSettings, value?: string | D
  * كده display_quantity بيفضل أكبر من stock_quantity، وحساب «المستودع»
  * (الإجمالي − المعروض) بيطلع صفر بالغلط رغم إن في بضاعة في المخزن.
  */
-function displayAfterStockDrop(product: { stock_quantity?: number; display_quantity?: number } | undefined, newStock: number): number {
-  return Math.min(Number(product?.display_quantity) || 0, Math.max(0, newStock));
+function displayAfterStockDrop(product: { stock_quantity?: number; display_quantity?: number } | undefined, newStock: number, dropQty: number = 0): number {
+  const currentDisplay = Number(product?.display_quantity) || 0;
+  if (dropQty > 0) {
+    return Math.max(0, Math.min(newStock, currentDisplay - dropQty));
+  }
+  return Math.min(currentDisplay, Math.max(0, newStock));
 }
 
 async function ensureAccountingDayOpen(state: CashierStore, value?: string | Date | null): Promise<boolean> {
@@ -1323,7 +1318,7 @@ export const useStore = create<CashierStore>((set, get) => ({
   categories: [],
   customers: [],
   suppliers: [],
-  cashiers: DEFAULT_DEMO_CASHIERS,
+  cashiers: [],
   materials: [],
   productionOrders: [],
   cart: [],
@@ -1366,7 +1361,7 @@ export const useStore = create<CashierStore>((set, get) => ({
   activeCashier: null,
   isAdminAuthenticated: !!sessionStorage.getItem('cashier_admin_auth'),
   adminPermissions: (() => { try { const v = sessionStorage.getItem('admin_permissions'); return v ? JSON.parse(v) : null; } catch { return null; } })(),
-  adminUsers: DEFAULT_DEMO_ADMIN_USERS,
+  adminUsers: [],
   isPOSAuthenticated: !!sessionStorage.getItem('cashier_pos_auth'),
 
   // Admin login: authenticates against Supabase Auth using a fixed admin
@@ -1399,14 +1394,6 @@ export const useStore = create<CashierStore>((set, get) => ({
 
   // دخول مستخدم لوحة تحكم بصلاحيات محددة
   loginAdminUser: async (user, password) => {
-    if (password === '1234' || password === '1111' || (user?.password && password === user.password)) {
-      const perms = Array.isArray(user?.permissions) ? user.permissions : [];
-      sessionStorage.setItem('cashier_admin_auth', 'true');
-      sessionStorage.setItem('admin_permissions', JSON.stringify(perms));
-      set({ isAdminAuthenticated: true, adminPermissions: perms });
-      await get().loadAll(true).catch(() => {});
-      return true;
-    }
     if (!user?.email) return false;
     const { error } = await supabase.auth.signInWithPassword({ email: user.email, password });
     if (error) return false;
@@ -1420,8 +1407,7 @@ export const useStore = create<CashierStore>((set, get) => ({
 
   loadAdminUsers: async () => {
     const { data } = await supabase.from('admin_users').select('*').order('name');
-    if (data && data.length > 0) set({ adminUsers: (data as unknown as AdminUser[]) });
-    else set({ adminUsers: DEFAULT_DEMO_ADMIN_USERS });
+    if (data) set({ adminUsers: (data as unknown as AdminUser[]) });
   },
 
   addAdminUser: async ({ name, password, permissions }) => {
@@ -1536,12 +1522,14 @@ export const useStore = create<CashierStore>((set, get) => ({
     // وإلا شاشة الدخول بتفضل فاضية ومش هينفع حد يفتح الصبح.
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       const snap = await loadSnapshot();
-      set((state) => ({
-        cashiers: (snap?.cashiers && snap.cashiers.length > 0 ? snap.cashiers : DEFAULT_DEMO_CASHIERS) as Cashier[],
-        storeSettings: snap?.settings || state.storeSettings,
-        isOfflineMode: true,
-        offlineSnapshotAt: snap?.savedAt || null,
-      }));
+      if (snap) {
+        set((state) => ({
+          cashiers: (snap.cashiers || []) as Cashier[],
+          storeSettings: snap.settings || state.storeSettings,
+          isOfflineMode: true,
+          offlineSnapshotAt: snap.savedAt || null,
+        }));
+      }
       return;
     }
     // مهلة قصيرة عشان شاشة الدخول ماتفضلش فاضية على نت بطيء.
@@ -1555,18 +1543,19 @@ export const useStore = create<CashierStore>((set, get) => ({
     }
     if (error || !data) {
       const snap = await loadSnapshot();
-      set((state) => ({
-        cashiers: (snap?.cashiers && snap.cashiers.length > 0 ? snap.cashiers : DEFAULT_DEMO_CASHIERS) as Cashier[],
-        storeSettings: snap?.settings || state.storeSettings,
-        isOfflineMode: true,
-        offlineSnapshotAt: snap?.savedAt || null,
-      }));
+      if (snap) {
+        set((state) => ({
+          cashiers: (snap.cashiers || []) as Cashier[],
+          storeSettings: snap.settings || state.storeSettings,
+          isOfflineMode: true,
+          offlineSnapshotAt: snap.savedAt || null,
+        }));
+      }
       return;
     }
     const s = (data as any).settings || {};
-    const fetchedCashiers = ((data as any).cashiers || []) as Cashier[];
     set((state) => ({
-      cashiers: fetchedCashiers.length > 0 ? fetchedCashiers : DEFAULT_DEMO_CASHIERS,
+      cashiers: ((data as any).cashiers || []) as Cashier[],
       storeSettings: {
         ...state.storeSettings,
         name: s.name ?? state.storeSettings.name,
@@ -2090,7 +2079,7 @@ export const useStore = create<CashierStore>((set, get) => ({
           const netQty = item.quantity - (item.returned_quantity || 0);
           const newStock = Math.max(0, currentStock - netQty);
           await supabase.from('products')
-            .update({ stock_quantity: newStock, display_quantity: displayAfterStockDrop(prodData as any, newStock) })
+            .update({ stock_quantity: newStock, display_quantity: displayAfterStockDrop(prodData as any, newStock, item.quantity) })
             .eq('id', item.id);
         }
 
@@ -2296,7 +2285,7 @@ export const useStore = create<CashierStore>((set, get) => ({
         const cartItem = state.cart.find((c) => c.id === p.id);
         if (!cartItem) return p;
         const newStock = Math.max(0, p.stock_quantity - cartItem.quantity);
-        return { ...p, stock_quantity: newStock, display_quantity: displayAfterStockDrop(p, newStock) };
+        return { ...p, stock_quantity: newStock, display_quantity: displayAfterStockDrop(p, newStock, cartItem.quantity) };
       });
 
       const updatedCustomers = finalCustomer && !state.customers.find((c) => c.id === finalCustomer!.id)
@@ -2451,7 +2440,7 @@ export const useStore = create<CashierStore>((set, get) => ({
         const prod = state.products.find((p) => p.id === item.id);
         const newQty = Math.max(0, (prod?.stock_quantity ?? 0) - item.quantity);
         await supabase.from('products')
-          .update({ stock_quantity: newQty, display_quantity: displayAfterStockDrop(prod, newQty) })
+          .update({ stock_quantity: newQty, display_quantity: displayAfterStockDrop(prod, newQty, item.quantity) })
           .eq('id', item.id);
       }
 
@@ -2482,7 +2471,7 @@ export const useStore = create<CashierStore>((set, get) => ({
         const cartItem = state.cart.find((c) => c.id === p.id);
         if (!cartItem) return p;
         const newStock = Math.max(0, p.stock_quantity - cartItem.quantity);
-        return { ...p, stock_quantity: newStock, display_quantity: displayAfterStockDrop(p, newStock) };
+        return { ...p, stock_quantity: newStock, display_quantity: displayAfterStockDrop(p, newStock, cartItem.quantity) };
       });
 
       const updatedCustomers = finalCustomer && !state.customers.find((c) => c.id === finalCustomer!.id)
@@ -2653,7 +2642,7 @@ export const useStore = create<CashierStore>((set, get) => ({
           const prod = state.products.find((p) => p.id === item.id);
           const newQty = Math.max(0, (prod?.stock_quantity ?? 0) - item.quantity);
           await supabase.from('products')
-            .update({ stock_quantity: newQty, display_quantity: displayAfterStockDrop(prod, newQty) })
+            .update({ stock_quantity: newQty, display_quantity: displayAfterStockDrop(prod, newQty, item.quantity) })
             .eq('id', item.id);
         }
       }
@@ -2662,7 +2651,7 @@ export const useStore = create<CashierStore>((set, get) => ({
         const cartItem = state.cart.find((c) => c.id === p.id);
         if (!cartItem) return p;
         const newStock = Math.max(0, p.stock_quantity - cartItem.quantity);
-        return { ...p, stock_quantity: newStock, display_quantity: displayAfterStockDrop(p, newStock) };
+        return { ...p, stock_quantity: newStock, display_quantity: displayAfterStockDrop(p, newStock, cartItem.quantity) };
       });
 
       // تحصيل العربون: يدخل الخزنة كإيراد حجز (category='حجز', amount سالب).
@@ -3628,7 +3617,7 @@ export const useStore = create<CashierStore>((set, get) => ({
         const dbStock = (prodData?.stock_quantity ?? localStock) as number;
         const dbDisplay = (prodData?.display_quantity ?? localDisplay) as number;
         const newStock = Math.max(0, dbStock + delta);
-        const newDisplay = delta > 0 ? dbDisplay + delta : displayAfterStockDrop({ stock_quantity: dbStock, display_quantity: dbDisplay }, newStock);
+        const newDisplay = delta > 0 ? dbDisplay + delta : displayAfterStockDrop({ stock_quantity: dbStock, display_quantity: dbDisplay }, newStock, Math.abs(delta));
 
         const { error: productError } = await supabase
           .from('products')
@@ -3641,7 +3630,7 @@ export const useStore = create<CashierStore>((set, get) => ({
           updatedProducts[productIndex] = {
             ...updatedProducts[productIndex],
             stock_quantity: Math.max(0, localStock + delta),
-            display_quantity: delta > 0 ? localDisplay + delta : displayAfterStockDrop(updatedProducts[productIndex], Math.max(0, localStock + delta)),
+            display_quantity: delta > 0 ? localDisplay + delta : displayAfterStockDrop(updatedProducts[productIndex], Math.max(0, localStock + delta), Math.abs(delta)),
           };
         }
       }
