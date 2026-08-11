@@ -44,21 +44,27 @@ export default function POSLogin() {
             </div>
           </div>
 
-          <h2 className="text-2xl font-black text-center text-slate-800 dark:text-white mb-2">تسجيل الدخول</h2>
-          <p className="text-center text-slate-400 text-sm mb-4 font-bold">يرجى إدخال كلمة المرور للبدء</p>
-
           {/* وضع أوفلاين: الدخول بيتم من النسخة المحفوظة على الجهاز */}
           {isOfflineMode && (
-            <div className="mb-6 bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-2xl p-4 text-center">
-              <p className="text-amber-800 dark:text-amber-300 font-black text-sm">📴 مفيش نت — وضع أوفلاين</p>
-              <p className="text-amber-700 dark:text-amber-400/80 text-[11px] font-bold mt-1 leading-relaxed">
+            <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-2xl p-3 text-center">
+              <p className="text-amber-800 dark:text-amber-300 font-black text-xs">📴 مفيش نت — وضع أوفلاين</p>
+              <p className="text-amber-700 dark:text-amber-400/80 text-[10px] font-bold mt-0.5 leading-relaxed">
                 هتشتغل بالأسعار والمخزون المحفوظين على الجهاز
                 {offlineSnapshotAt ? ` (آخر تحديث: ${new Date(offlineSnapshotAt).toLocaleString('ar-EG')})` : ''}.
-                الفواتير هتتحفظ وترتفع لوحدها أول ما النت يرجع.
               </p>
             </div>
           )}
-          
+
+          {/* تنبيه تجربة الديمو للعملاء الجدد */}
+          <div className="mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 border-2 border-indigo-200/80 dark:border-indigo-800/80 rounded-2xl p-3.5 text-center">
+            <p className="text-indigo-900 dark:text-indigo-200 font-black text-xs flex items-center justify-center gap-1.5">
+              <span>✨</span> حسابات تجربة الديمو (Demo Users)
+            </p>
+            <p className="text-indigo-700 dark:text-indigo-300 text-[11px] font-bold mt-1">
+              اختر اسم الكاشير واستخدم كلمة السر: <span className="font-mono bg-indigo-200 dark:bg-indigo-900/80 text-indigo-950 dark:text-white px-2 py-0.5 rounded font-black text-xs">1234</span>
+            </p>
+          </div>
+
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-1.5">
                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-1">اسم الكاشير</label>
