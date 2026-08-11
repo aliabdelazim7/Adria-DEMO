@@ -170,7 +170,12 @@ export default function Attendance() {
         {/* Header */}
         <div className="text-center mb-6">
           {branding.logo && (
-            <img src={branding.logo} alt="Logo" className="h-16 w-auto max-w-[200px] mx-auto rounded-3xl shadow-xl mb-3 p-1 bg-white object-contain" />
+            <img
+              src={branding.logo}
+              alt="Logo"
+              className="h-16 w-auto max-w-[200px] mx-auto rounded-3xl shadow-xl mb-3 p-1 bg-white object-contain"
+              onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+            />
           )}
           <h1 className="text-2xl font-black text-slate-800 dark:text-white">{branding.name}</h1>
           <p className="text-slate-500 font-bold flex items-center justify-center gap-2 mt-1">

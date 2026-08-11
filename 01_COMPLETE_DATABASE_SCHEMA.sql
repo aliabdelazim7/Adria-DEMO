@@ -14,7 +14,7 @@ create table if not exists store_settings (
   id uuid default gen_random_uuid() primary key,
   name text not null default 'ADRIA - بوتيك الملابس والأزياء',
   currency text default 'ج.م',
-  logo text default 'https://cdn-icons-png.flaticon.com/512/3143/3143641.png',
+  logo text default '',
   tax_rate numeric default 0,
   theme_color text default '#4f46e5',
   address text default 'القاهرة - المعادي - شارع النصر',

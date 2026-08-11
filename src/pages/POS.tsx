@@ -3628,7 +3628,18 @@ export default function POS() {
             {/* Right: Avatar and Message */}
             <div className="flex items-center gap-2 shrink-0">
               <div className="relative group cursor-pointer" onClick={() => { if (confirm('هل تريد تسجيل الخروج؟')) { logoutPOS(); navigate('/pos-login'); } }}>
-                <img src={activeCashier?.photo_url || storeSettings.logo} alt="Logo" className="w-12 h-12 object-contain rounded-xl shadow-md border border-gray-100 dark:border-slate-700 bg-white p-0.5 group-hover:scale-110 transition-transform" />
+                {activeCashier?.photo_url || storeSettings.logo ? (
+                  <img
+                    src={activeCashier?.photo_url || storeSettings.logo}
+                    alt="Logo"
+                    className="w-12 h-12 object-contain rounded-xl shadow-md border border-gray-100 dark:border-slate-700 bg-white p-0.5 group-hover:scale-110 transition-transform"
+                    onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-indigo-600 text-white font-black text-xs shadow-md border border-indigo-500 group-hover:scale-110 transition-transform">
+                    ADRIA
+                  </div>
+                )}
                 <div className="absolute -bottom-1 -right-1 bg-green-500 w-4 h-4 rounded-full border-2 border-white dark:border-slate-900"></div>
               </div>
               <button 

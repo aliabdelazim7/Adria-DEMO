@@ -115,7 +115,18 @@ export default function AdminLayout() {
       <div className={`fixed lg:static inset-y-0 right-0 w-72 max-w-[85vw] bg-slate-900 text-slate-300 flex flex-col shadow-2xl z-40 transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'} lg:translate-x-0 lg:w-64`}>
         <div className="p-5 pb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 bg-slate-800 p-3 rounded-2xl border border-slate-700 flex-1 min-w-0">
-            <img src={storeSettings.logo} alt="Logo" className="h-10 w-auto max-w-[120px] rounded-xl bg-white object-contain" />
+            {storeSettings.logo ? (
+              <img
+                src={storeSettings.logo}
+                alt="Logo"
+                className="h-10 w-auto max-w-[120px] rounded-xl bg-white object-contain"
+                onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black text-xs shrink-0 shadow-md">
+                ADRIA
+              </div>
+            )}
             <div className="flex flex-col flex-1 min-w-0">
               <span className="font-bold text-white text-sm truncate" title={storeSettings.name}>{storeSettings.name}</span>
               <span className="text-xs text-slate-400">لوحة الإدارة</span>
